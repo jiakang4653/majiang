@@ -1,0 +1,1737 @@
+/*
+back.strings
+MaJDemo
+
+Created by ly on 2017/3/2.
+Copyright © 2017年 HX. All rights reserved.
+*/
+
+//
+//  PersonView.m
+//  MaJDemo
+//
+//  Created by ly on 2017/1/17.
+//  Copyright © 2017年 HX. All rights reserved.
+//
+
+#import "PersonView.h"
+
+#import "CardView.h"
+#import "MajHelper.h"
+
+
+
+
+@interface PersonView()
+
+{
+//每次的结果
+NSInteger dic_error;
+NSString *dic_correctString;
+NSMutableArray *dic_lastCharArray ;
+NSMutableArray *dic_needCharArray ;
+NSMutableArray *dic_preWordsArray ;
+NSMutableDictionary *dic_eatDic;
+NSMutableDictionary *dic_eatDicAll;
+
+
+
+}
+
+@property (nonatomic,strong) NSMutableArray *charArray;
+@property (nonatomic,strong) NSMutableArray *charViewArray;
+@property (nonatomic,strong) NSMutableArray *selectedCharViewArray;
+@property (nonatomic) DeskDirect deskDirect;
+@property (nonatomic) NSInteger shuaiziNum;
+@property (nonatomic,strong) UIButton *aButton;
+
+@property (nonatomic) NSInteger currentSelectedIndex;
+@property (nonatomic) NSInteger currentRemovedIndex;
+@property (nonatomic) CardView* currentSelectedView;
+
+@property (nonatomic) BOOL tingSet ;
+@property (nonatomic,strong) NSString* tingNeedChar;
+@property (nonatomic,strong) NSString* tingLastChar;
+
+@property (nonatomic,strong) UIView *eatView;
+@property (nonatomic,strong) UIView *controlView;
+@property (nonatomic,strong) UIScrollView *outView;
+@property (nonatomic,strong) UILabel *wordInfoView;
+@property (nonatomic,strong) UILabel *tingView;
+@property (nonatomic,strong) NSMutableArray *outViewArray;
+
+
+@property (nonatomic,strong) NSMutableArray* eatCharArray;
+@property (nonatomic,strong) NSMutableArray* eatCharViewArray;
+@property (nonatomic,strong) NSString* eatCharFromOther;
+@property (nonatomic,strong) NSString* eatCharFromLibrary;
+
+
+@property (nonatomic,strong) CardView* moveCardView;;
+@property (nonatomic,strong) CardView* operCardView;;
+@property (nonatomic) CGFloat moveLastX;;
+
+@property (nonatomic,strong) CAShapeLayer *border;
+@property (nonatomic,strong) CAShapeLayer *eatborder;
+@property (nonatomic) BOOL borderState;
+@property (nonatomic,strong) UILabel *borderInfo;
+
+@property (nonatomic) NSInteger stepFromOtherOrLibrary;
+
+
+@end
+
+@implementation PersonView
+/*
+// Only override drawRect: if you perform custom drawing.
+// An empty implementation adversely affects performance during animation.
+- (void)drawRect:(CGRect)rect {
+// Drawing code
+}
+*/
+-(UILabel *) tingView{
+if (_tingView == nil) {
+_tingView = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, self.bounds.size.height)];
+_tingView.text = @"听";
+_tingView.backgroundColor = [UIColor clearColor];
+_tingView.textColor = [UIColor redColor];
+_tingView.font = [UIFont systemFontOfSize:60];
+_tingView.textAlignment = NSTextAlignmentLeft;
+[self addSubview:_tingView];
+_tingView.hidden = YES;
+}
+return _tingView;
+}
+
+-(UILabel *) wordInfoView{
+if (_wordInfoView == nil) {
+_wordInfoView = [[UILabel alloc] initWithFrame:CGRectMake(0, 15, self.bounds.size.width, 25)];
+_wordInfoView.backgroundColor = [UIColor clearColor];
+_wordInfoView.textColor = [UIColor redColor];
+_wordInfoView.font = [UIFont systemFontOfSize:10];
+_wordInfoView.textAlignment = NSTextAlignmentLeft;
+}
+return _wordInfoView;
+}
+-(UIView *)controlView{
+if (_controlView == nil) {
+_controlView = [[UIView alloc] initWithFrame:CGRectMake((self.bounds.size.width - 150-10), self.bounds.size.height-10-50, 150, 30)];
+NSArray *buttons = @[@"吃",@"组",@"听",@"胡",@"过"];
+for (NSInteger i = 0; i<5; i++) {
+UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+button.frame = CGRectMake(i*30, 0, 30, 30);
+[_controlView addSubview:button];
+button.tag = 1000+i;
+
+[button addTarget:self action:@selector(actionControl:) forControlEvents:UIControlEventTouchUpInside];
+
+[button setTitle:[buttons objectAtIndex:i] forState:UIControlStateNormal];
+[button setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+if (i == 1) {
+[button setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+}
+}
+}
+return _controlView;
+}
+
+-(UIView *) outView{
+
+if (_outView == nil) {
+_outView = [[UIScrollView alloc] init];
+if (self.deskDirect == DeskDirect_TOP) {
+_outView.frame = CGRectMake(0, self.bounds.size.height - 90, self.bounds.size.width, 90);
+}else
+_outView.frame = CGRectMake(0, 0, self.bounds.size.width, 90);
+}
+return _outView;
+}
+
+-(instancetype)initWithFrame:(CGRect)frame  {
+self = [super initWithFrame:frame];
+if (self) {
+self.currentSelectedIndex = -1;
+self.charViewArray = [NSMutableArray array];
+self.selectedCharViewArray = [NSMutableArray array];
+[self addClickBlock:^(NSInteger tag) {
+[self actionDownForDoubleClick];
+}];
+}
+return self;
+}
+
+-(void) setupPersonInfo{
+
+_aButton = [UIButton buttonWithType:UIButtonTypeCustom];
+_aButton.frame = CGRectMake(self.bounds.size.width - 10 - 40, self.bounds.size.height - 10-30, 40, 30);
+[_aButton setTitle:@"打出" forState:UIControlStateNormal];
+[_aButton addTarget:self action:@selector(actionMethod:) forControlEvents:UIControlEventTouchUpInside];
+[self addSubview:_aButton];
+}
+-(void) setupWordInfo{
+[self addSubview:self.wordInfoView];
+}
+-(void) setupControl{
+[self addSubview:self.controlView];
+}
+-(void) setupOutView{
+[self addSubview:self.outView];
+}
+#pragma mark =========================================method
+-(void) actionMethod:(UIButton *) button{
+if (self.selectedCharViewArray.count >1) {
+[self actionDownForDoubleClick];
+return;
+}
+if (self.selectedCharViewArray.count == 0) {
+return;
+}
+
+NSInteger eatCount = 0;
+for (NSInteger i = 0; i<self.eatCharViewArray.count; i++) {
+NSArray *tmp = [self.eatCharViewArray objectAtIndex:i];
+eatCount += tmp.count;
+}
+if ((self.charViewArray.count + eatCount) != 14) {
+if (self.didError) {
+self.didError(0);
+}
+return;
+}
+
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+self.borderState = NO;
+
+NSString *cha = [self.currentSelectedView charV];
+
+NSInteger index = [self.charArray indexOfObject:cha];
+if (index != NSNotFound) {
+//        [self.charArray removeObjectAtIndex:index];
+//        [self.currentSelectedView removeFromSuperview];
+//        [self.charViewArray removeObject:self.currentSelectedView];
+
+//        self.currentRemovedIndex = self.currentSelectedIndex;
+//        self.currentSelectedView = nil;
+//        self.currentSelectedIndex = -1;
+
+
+[self actionOut:cha];
+[self resetFrame];
+}
+
+
+}
+-(void) setupEatView{
+[self addSubview:self.eatView];
+}
+-(void) setupCardInfo{
+
+if (self.deskDirect == DeskDirect_BOTTOM) {
+float rightSpace = 160.0;
+float margin = 0.0;
+float cardw = MIN(50, (SCREEN_W-2*margin-rightSpace) / 14.0);
+float cardh = CARDH * 1.0 / CARDW *cardw;
+
+for (NSInteger i = 0; i<self.charArray.count; i++) {
+CardView *tmpv = [[CardView alloc] initWithFrame:CGRectMake(margin+i*cardw, self.bounds.size.height - cardh, cardw, cardh) withChar:[self.charArray objectAtIndex:i] isBack:NO];
+tmpv.tag = 100+i;
+NSLog(@"%@",NSStringFromCGRect(tmpv.frame));
+[tmpv addClickBlock:^(NSInteger tag) {
+
+//去掉编辑模式逻辑
+//                if (self.currentSelectedIndex == tag - 100) {
+//                    return ;
+//                }
+//                if (self.currentSelectedIndex == -1) {
+//                    self.currentSelectedIndex = tag - 100;
+//                    self.currentSelectedView = tmpv;
+//                    [self setUP:self.currentSelectedView];
+//                }else{
+//                    if (self.borderState) {
+//                        NSInteger index = [self indexofCrad:tmpv];
+//                        NSInteger sindex = [self indexofCrad:self.currentSelectedView];
+//                        if (index != NSNotFound && sindex != NSNotFound) {
+//                            if (sindex>index) {
+//                                [self.charViewArray removeObject:self.currentSelectedView];
+//                                [self.charViewArray insertObject:self.currentSelectedView atIndex:index];
+//                            }else{
+//                                [self.charViewArray removeObject:self.currentSelectedView];
+//                                [self.charViewArray insertObject:self.currentSelectedView atIndex:index-1];
+//                            }
+//                            [self resetFrame];
+//                            self.currentSelectedView = nil;
+//                            self.currentSelectedIndex = -1;
+//
+//                        }
+//                    }else{
+//                        [self setDown:self.currentSelectedView];
+//                        self.currentSelectedIndex = tag - 100;
+//                        self.currentSelectedView = tmpv;
+//                        [self setUP:self.currentSelectedView];
+//                    }
+//                }
+
+
+
+
+if (tmpv.isUpState) {
+[self.selectedCharViewArray removeObject:tmpv];
+[self setDown:tmpv];
+}else{
+[self.selectedCharViewArray addObject:tmpv];
+[self setUP:tmpv];
+}
+if (self.selectedCharViewArray.count == 1) {
+CardView *selectedv = [self.selectedCharViewArray objectAtIndex:0];
+self.currentSelectedIndex = selectedv.tag - 100;
+self.currentSelectedView = selectedv;
+}
+
+
+}];
+
+//            [tmpv addDoubleClickBlock:^(NSInteger tag) {
+//                [self actionDownForDoubleClick];
+//                [self actionUpForDoubleClick:[self.charArray objectAtIndex:i]];
+//            }];
+
+[self.charViewArray addObject:tmpv];
+[self addSubview:tmpv];
+}
+}else
+if (self.deskDirect == DeskDirect_TOP) {
+float leftSpace = 110.0;
+float margin = 0.0;
+float cardw = MIN(30, (SCREEN_W-2*margin-leftSpace) / 14.0);
+float cardh = CARDH * 1.0 / CARDW *cardw;
+
+for (NSInteger i = 0; i<self.charArray.count; i++) {
+CardView *tmpv = [[CardView alloc] initWithFrame:CGRectMake(margin+leftSpace+i*cardw, 0, cardw, cardh) withChar:[self.charArray objectAtIndex:i] isBack:YES];
+//                UILongPressGestureRecognizer *longGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(buttonLongPressed:)];
+//                [tmpv addGestureRecognizer:longGesture];
+
+[self.charViewArray addObject:tmpv];
+[self addSubview:tmpv];
+}
+}
+
+}
+-(void) setChar:(NSMutableArray *)charArray{
+if (self.charArray == nil) {
+self.charArray = [NSMutableArray array];
+}
+[self.charArray removeAllObjects];
+[self.charArray addObjectsFromArray:charArray];
+
+if (self.deskDirect == DeskDirect_BOTTOM) {
+[self setupEatView];
+}
+
+[self setupCardInfo];
+[self setupOutView];
+
+if (self.deskDirect == DeskDirect_BOTTOM) {
+[self setupPersonInfo];
+[self setupControl];
+}
+
+[self setupWordInfo];
+
+
+}
+
+-(void) setDirect:(DeskDirect)deskDirect{
+
+
+self.deskDirect = deskDirect;
+
+}
+
+-(void)setShuaiziNum:(NSInteger)shuaiziNum{
+if (self.shuaiziNum != shuaiziNum) {
+self.shuaiziNum = shuaiziNum;
+}
+}
+-(void) setUP:(UIView *) view{
+if ([view isKindOfClass:[CardView class]]) {
+CardView *tmp =(CardView *) view;
+if (!tmp.isUpState) {
+tmp.frame = CGRectMake(view.frame.origin.x, view.frame.origin.y-20, view.bounds.size.width, view.bounds.size.height);
+tmp.isUpState = TRUE;
+}
+}else
+view.frame = CGRectMake(view.frame.origin.x, view.frame.origin.y-20, view.bounds.size.width, view.bounds.size.height);
+}
+-(void) setDown:(UIView *) view{
+if ([view isKindOfClass:[CardView class]]) {
+CardView *tmp =(CardView *) view;
+if (tmp.isUpState) {
+tmp.frame = CGRectMake(view.frame.origin.x, view.frame.origin.y+20, view.bounds.size.width, view.bounds.size.height);
+tmp.isUpState = FALSE;
+}
+}else
+
+view.frame = CGRectMake(view.frame.origin.x, view.frame.origin.y+20, view.bounds.size.width, view.bounds.size.height);
+}
+-(void) setLogoInfo:(NSDictionary *) dic{
+NSInteger error = [[dic objectForKey:@"error"] integerValue];//还手率
+NSString * correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+NSMutableArray* lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+NSMutableArray*needCharArray = [dic objectForKey:@"need"];//需要的字母
+NSMutableArray* preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+
+
+NSString *logo = [NSString stringWithFormat:@"已完成:%@ 换手次:%zd 目标单词:%@ 需打出:%@ 需进入:%@",[self genLog:preWordsArray],error,correctString,[self genLog:lastCharArray],[self genLog:needCharArray]];
+_wordInfoView.text = logo;
+
+}
+-(NSString *) genLog:(NSArray *) array{
+
+NSMutableString *mu = [[NSMutableString alloc] init];
+for (NSInteger i = 0; i<array.count; i++) {
+[mu appendString:[array objectAtIndex:i]];
+if (i != array.count-1) {
+[mu appendString:@"-"];
+}
+}
+return mu;
+}
+
+-(void) resetFrame{
+if (self.deskDirect == DeskDirect_BOTTOM) {
+float rightSpace = 160.0;
+float margin = 0.0;
+float cardw = MIN(50, (SCREEN_W-2*margin-rightSpace) / 14.0);
+float cardh = CARDH * 1.0 / CARDW *cardw;
+
+float cardeatw = cardw;
+float cardeath = CARDEATH / CARDEATW * cardeatw;
+
+
+float beginx = 0;
+float numofword = 0;
+float afterlen = 0;
+
+for (NSInteger i = 0; i<self.eatCharViewArray.count; i++) {
+NSMutableArray *oneWords = [self.eatCharViewArray objectAtIndex:i];
+
+NSMutableArray *views = [self.eatCharViewArray objectAtIndex:i];
+for (NSInteger j = 0; j<oneWords.count; j++) {
+numofword++;
+UIView *v = [views objectAtIndex:j];
+v.userInteractionEnabled = NO;
+v.frame = CGRectMake(afterlen*cardeatw+beginx+ margin+j*cardeatw, self.bounds.size.height - cardh, cardeatw, cardeath);
+}
+afterlen += oneWords.count;
+beginx += 5;
+
+}
+
+float beginxx = 0;
+beginxx += beginx;
+beginxx += numofword*cardw;
+
+BOOL needAdd  = (numofword + self.charViewArray.count == 14) ? TRUE : FALSE;
+
+for (NSInteger i = 0;i<self.charViewArray.count;i++) {
+UIView *v = [self.charViewArray objectAtIndex:i];
+v.frame = CGRectMake(beginxx+margin+i*cardw, self.bounds.size.height - cardh, cardw, cardh);
+if ( needAdd && (i == self.charViewArray.count-1)) {
+v.frame = CGRectMake(beginxx+margin+i*cardw+15, self.bounds.size.height - cardh, cardw, cardh);
+}
+}
+}else{
+float leftSpace = 110.0;
+float margin = 0.0;
+float cardw = MIN(30, (SCREEN_W-2*margin-leftSpace) / 14.0);
+float cardh = CARDH * 1.0 / CARDW *cardw;
+
+float cardeatw = cardw;
+float cardeath = CARDEATH / CARDEATW * cardeatw;
+
+float beginx = 0;
+float numofword = 0;
+float afterlen = 0;
+
+for (NSInteger i = 0; i<self.eatCharViewArray.count; i++) {
+NSMutableArray *oneWords = [self.eatCharViewArray objectAtIndex:i];
+
+NSMutableArray *views = [self.eatCharViewArray objectAtIndex:i];
+for (NSInteger j = 0; j<oneWords.count; j++) {
+numofword++;
+UIView *v = [views objectAtIndex:j];
+v.frame = CGRectMake(afterlen*cardeatw+beginx+ margin+j*cardeatw + leftSpace, 0, cardeatw, cardeath);
+}
+afterlen += oneWords.count;
+beginx += 5;
+
+}
+
+float beginxx = 0;
+beginxx += beginx;
+beginxx += numofword*cardw;
+
+BOOL needAdd  = (numofword + self.charViewArray.count == 14) ? TRUE : FALSE;
+
+for (NSInteger i = 0;i<self.charViewArray.count;i++) {
+UIView *v = [self.charViewArray objectAtIndex:i];
+v.frame = CGRectMake(beginxx+margin+i*cardw + leftSpace, 0, cardw, cardh);
+if ( needAdd && (i == self.charViewArray.count-1)) {
+v.frame = CGRectMake(beginxx+margin+i*cardw+leftSpace+15, 0, cardw, cardh);
+}
+
+}
+}
+
+}
+
+
+#pragma mark =======================================begin
+#pragma mark =======================================begin
+#pragma mark =======================================begin
+
+-(void) addCharFromPerson:(NSString *) acha FromLibrary:(NSString *)achaLibrary{
+
+
+if (_tingSet) {
+dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+if ([acha isEqualToString:_tingNeedChar] || [acha isEqualToString:WNKEY]) {
+NSLog(@"鸡胡");
+[self.charArray addObject:acha];
+//                [self actionEat:acha];
+
+[self cardToIn:acha];
+
+NSArray *targetword = [dic_correctString componentsSeparatedByString:@","];
+if (targetword != nil && targetword.count>0) {
+[dic_preWordsArray addObjectsFromArray:targetword];
+}
+
+
+//                dispatch_async(dispatch_get_main_queue(), ^{
+//                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//                    for (NSString *word in dic_preWordsArray) {
+//                        [self actionEat:word];
+//                    }
+//                    [self callbackHU:@"0"];
+//                });
+//                    });
+
+[self performSelector:@selector(successful) withObject:nil afterDelay:0.5];
+
+}else
+if ([achaLibrary isEqualToString:_tingNeedChar] || [achaLibrary isEqualToString:WNKEY]) {
+NSLog(@"自摸胡");
+[self.charArray addObject:achaLibrary];
+//                    [self actionEat:achaLibrary];
+[self cardToIn:achaLibrary];
+NSArray *targetword = [dic_correctString componentsSeparatedByString:@","];
+if (targetword != nil && targetword.count>0) {
+[dic_preWordsArray addObjectsFromArray:targetword];
+}
+
+[self performSelector:@selector(successful) withObject:nil afterDelay:0.5];
+
+
+}else{
+[self.charArray addObject:achaLibrary];
+[self cardToIn:achaLibrary];
+
+//                    [self actionOut:achaLibrary];
+[self performSelector:@selector(actionOut:) withObject:achaLibrary afterDelay:0.5];
+
+
+
+}
+});
+
+}
+else{
+
+self.eatCharFromOther = acha;
+self.eatCharFromLibrary = achaLibrary;
+
+BOOL theSame = [acha isEqualToString:achaLibrary];
+
+NSMutableArray *tmp = [NSMutableArray array];
+[tmp addObjectsFromArray:self.charArray];
+[tmp addObject:acha];
+NSDictionary *dic = [[MajHelper shareHelper] start:tmp];
+dic_error = [[dic objectForKey:@"error"] integerValue];//还手率
+dic_correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+dic_lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+dic_needCharArray = [dic objectForKey:@"need"];//需要的字母
+dic_preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+
+
+
+
+//    NSDictionary *eatDic = [self canEat:dic_correctString byCHar:acha inArray:eatTmp];
+NSMutableDictionary *eatDic = [self canEatFromAreadlyWords:dic_preWordsArray lastChars:dic_lastCharArray byChar:acha allChars:tmp];
+dic_eatDic = eatDic;
+
+NSMutableDictionary *eatDicAll = [self canEatFromLibrary:[[MajHelper shareHelper] getWordsArray] allchars:self.charArray bychar:acha];
+dic_eatDicAll = eatDicAll;
+
+
+
+self.stepFromOtherOrLibrary = 1;
+
+
+BOOL iseat =FALSE;
+BOOL iseatall =FALSE;
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+
+iseatall = [[eatDicAll objectForKey:@"eat"] boolValue];
+
+if ([[eatDic objectForKey:@"eat"] boolValue] ) {
+iseat = TRUE;
+dispatch_async(dispatch_get_main_queue(), ^{
+[self setLogoInfo:dic];
+});
+}else{
+
+}
+if (dic_error == 0) {
+ishu = TRUE;
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+
+
+
+if (self.deskDirect == DeskDirect_TOP) { //电脑
+if (iseat) {
+NSLog(@"吃");
+[self.charArray addObject:acha];
+[self cardToIn:acha];
+NSString *word = [eatDic objectForKey:@"eatword"];
+[self actionEat:word];
+NSString *c0 = [dic_lastCharArray objectAtIndex:0];
+[self actionOut:c0];
+if (isting) {
+//因为不计算，prewordsArray里会多出已经吃过的
+NSInteger index = [dic_preWordsArray indexOfObject:word];
+if (index != NSNotFound) {
+[dic_preWordsArray removeObjectAtIndex:index];
+}
+_tingSet = TRUE;
+_tingNeedChar = [dic_needCharArray objectAtIndex:0];
+_tingLastChar = [dic_lastCharArray objectAtIndex:0];
+[self actionTing];
+
+}
+}else{
+[self.charArray addObject:achaLibrary];
+[self cardToIn:achaLibrary];
+
+NSMutableArray *tmptmp = [NSMutableArray array];
+[tmptmp addObjectsFromArray:self.charArray];
+NSDictionary *dic = [[MajHelper shareHelper] start:tmptmp];
+dic_error = [[dic objectForKey:@"error"] integerValue];//还手率
+dic_correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+dic_lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+dic_needCharArray = [dic objectForKey:@"need"];//需要的字母
+dic_preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+dispatch_async(dispatch_get_main_queue(), ^{
+[self setLogoInfo:dic];
+});
+
+BOOL iseat =FALSE;
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+
+if (dic_error == 0) {
+ishu = TRUE;
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+
+
+if (isting) {
+_tingSet = TRUE;
+_tingNeedChar = [dic_needCharArray objectAtIndex:0];
+_tingLastChar = [dic_lastCharArray objectAtIndex:0];
+[self actionTing];
+}
+
+if (ishu) {
+NSLog(@"胡");
+NSArray *targetword = [dic_correctString componentsSeparatedByString:@","];
+if (targetword != nil && targetword.count>0) {
+[dic_preWordsArray addObjectsFromArray:targetword];
+}
+//                dispatch_async(dispatch_get_main_queue(), ^{
+//                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//                    for (NSString *word in dic_preWordsArray) {
+//                        [self actionEat:word];
+//                    }
+//                    [self callbackHU:@"1"];
+//                });
+//                    });
+[self performSelector:@selector(successful) withObject:nil afterDelay:0.5];
+
+}else{
+NSString *c0 = [dic_lastCharArray objectAtIndex:0];
+
+if (self.charArray.count != self.charViewArray.count) {
+NSLog(@"error");
+}
+[self actionOut:c0];
+
+}
+}
+
+}
+else{
+if (iseat || ishu || iseatall) {
+
+[self resetControlByisEat:(iseat || iseatall) isting:NO ishu:ishu isguo:TRUE];
+NSMutableArray *earray = [NSMutableArray array];
+if (iseatall) {
+NSArray *all = [dic_eatDicAll objectForKey:@"eatword"];
+[earray addObjectsFromArray:all];
+}
+[self eatViewFreshByWords:earray];
+}
+else{
+
+self.stepFromOtherOrLibrary = 2;
+
+[self.charArray addObject:achaLibrary];
+[self cardToIn:achaLibrary];
+dispatch_async(dispatch_get_global_queue(0, 0), ^{
+
+
+
+NSMutableArray *tmp = [NSMutableArray array];
+[tmp addObjectsFromArray:self.charArray];
+NSDictionary *dic = [[MajHelper shareHelper] start:tmp];
+dic_error = [[dic objectForKey:@"error"] integerValue];//还手率
+dic_correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+dic_lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+dic_needCharArray = [dic objectForKey:@"need"];//需要的字母
+dic_preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+
+
+
+dispatch_async(dispatch_get_main_queue(), ^{
+[self setLogoInfo:dic];
+self.borderState = TRUE;
+});
+
+BOOL iseat =FALSE;
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+
+if (dic_error == 0) {
+ishu = TRUE;
+
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+dispatch_async(dispatch_get_main_queue(), ^{
+[self resetControlByisEat:false isting:isting ishu:ishu isguo:NO];
+});
+
+});
+}
+
+}
+
+}
+}
+
+
+-(NSMutableDictionary *) canEatFromAreadlyWords:(NSMutableArray *) words lastChars:(NSMutableArray *) chars byChar:(NSString *) bychar allChars:(NSMutableArray *) allChars{
+
+NSMutableDictionary *returnDic = [NSMutableDictionary dictionary];
+
+BOOL caneat = FALSE;
+NSString *eatWord;
+if ([chars indexOfObject:bychar] != NSNotFound) {
+[returnDic addEntriesFromDictionary:@{@"eat":[NSNumber numberWithBool:caneat]}];
+return returnDic;
+//        return @{@"eat":[NSNumber numberWithBool:caneat]};
+}
+
+for (NSInteger i = 0; i<words.count; i++) {
+NSString *word = [words objectAtIndex:i];
+if ([word containsString:bychar]) {
+caneat = TRUE;
+eatWord = word;
+break;
+}
+
+}
+
+if (caneat) {
+[returnDic addEntriesFromDictionary:@{@"eat":[NSNumber numberWithBool:caneat],@"eatword":eatWord}];
+}else{
+[returnDic addEntriesFromDictionary:@{@"eat":[NSNumber numberWithBool:caneat]}];
+}
+return returnDic;
+
+}
+
+-(NSMutableDictionary *) canEatFromLibrary:(NSMutableArray *) words allchars:(NSMutableArray *) chars bychar:(NSString *) bychar{
+
+NSMutableDictionary *returnDic = [NSMutableDictionary dictionary];
+NSMutableArray *returnWords = [NSMutableArray array];
+
+NSMutableArray *tmpChars = [NSMutableArray array];
+[tmpChars addObjectsFromArray:chars];
+[tmpChars addObject:bychar];
+
+for (NSInteger i = 0; i<words.count; i++) {
+NSString *word  =  [words objectAtIndex:i];
+
+if ([[MajHelper shareHelper] checkVailWord:word.length chars:tmpChars.count]) {
+if ([word containsString:bychar]) {
+NSDictionary *dic =   [[MajHelper shareHelper] compareWord:word inArray:tmpChars useWNKey:YES];
+NSInteger error = [[dic objectForKey:@"error"] integerValue];
+if (error == 0) {
+[returnWords addObject:word];
+}
+}
+
+}
+}
+
+if (returnWords.count>0) {
+[returnDic addEntriesFromDictionary:@{@"eat":[NSNumber numberWithBool:TRUE],@"eatword":returnWords}];
+}else
+[returnDic addEntriesFromDictionary:@{@"eat":[NSNumber numberWithBool:FALSE]}];
+return returnDic;
+
+
+
+}
+
+
+-(void) actionEatWithAll:(NSString *) eatWord{
+
+BOOL iseat = FALSE;
+BOOL iseatall = FALSE;
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+
+iseat = [[dic_eatDic objectForKey:@"eat"] boolValue];
+iseatall =[[dic_eatDicAll objectForKey:@"eat"] boolValue];
+
+if (dic_error == 0) {
+ishu = TRUE;
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+
+if ([dic_preWordsArray containsObject:eatWord]) {
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+[self.charArray addObject:self.eatCharFromOther];
+[self cardToIn:self.eatCharFromOther];
+//        NSString *word = [dic_eatDic objectForKey:@"eatword"];
+[self actionEat:eatWord];
+if (isting) {
+[self resetControlByisEat:NO isting:YES ishu:NO isguo:NO];
+}
+
+}else{
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+[self.charArray addObject:self.eatCharFromOther];
+[self cardToIn:self.eatCharFromOther];
+//        NSString *word = [dic_eatDic objectForKey:@"eatword"];
+[self actionEat:eatWord];
+}
+
+}
+
+-(void) actionControl:(UIButton *) button{ //tag+1000
+
+
+
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+if (dic_error == 0) {
+ishu = TRUE;
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+
+
+switch (button.tag-1000) {
+case 0: //吃
+{
+//            [self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+//            [self.charArray addObject:self.eatCharFromOther];
+//            [self cardToIn:self.eatCharFromOther];
+//            NSString *word = [dic_eatDic objectForKey:@"eatword"];
+//            [self actionEat:word];
+//            if (isting) {
+//                [self resetControlByisEat:NO isting:YES ishu:NO isguo:NO];
+//            }
+
+self.eatView.hidden = !self.eatView.hidden;
+
+}
+break;
+case 1://组
+{
+
+self.borderState = !self.borderState;
+}
+break;
+case 2://听
+{
+self.eatView.hidden = YES;
+
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+_tingNeedChar = [dic_needCharArray objectAtIndex:0];
+_tingLastChar = [dic_lastCharArray objectAtIndex:0];
+
+NSInteger index = [self.charArray indexOfObject:_tingLastChar];
+if (index != NSNotFound) {
+//                [self.charArray removeObjectAtIndex:index];
+CardView *targetCV;
+for (NSInteger i = 0; i<self.charViewArray.count; i++) {
+CardView *tmp = [self.charViewArray objectAtIndex:i];
+if ([tmp.charV isEqualToString:_tingLastChar]) {
+targetCV = tmp;
+break;
+}
+}
+if (targetCV) {
+[self.charArray removeObjectAtIndex:index];
+[targetCV removeFromSuperview];
+[self.charViewArray removeObject:targetCV];
+}
+
+[self cardToOutView:_tingLastChar];
+[self resetFrame];
+}
+[self performSelector:@selector(callBack:) withObject:_tingLastChar afterDelay:0.1];
+
+_tingSet = TRUE;
+[self actionTing];
+}
+break;
+case 3://胡
+{
+self.eatView.hidden = YES;
+
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+if (self.stepFromOtherOrLibrary == 1) {
+[self.charArray addObject:self.eatCharFromOther];
+[self cardToIn:self.eatCharFromOther];
+//                NSString *word = [dic_eatDic objectForKey:@"eatword"];
+//                [self actionEat:word];
+NSArray *targetword = [dic_correctString componentsSeparatedByString:@","];
+if (targetword != nil && targetword.count>0) {
+[dic_preWordsArray addObjectsFromArray:targetword];
+}
+//                dispatch_async(dispatch_get_main_queue(), ^{
+//                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//                    for (NSString *word in dic_preWordsArray) {
+//                        [self actionEat:word];
+//                    }
+//                    [self callbackHU:@"0"];
+//                });
+//                    });
+[self performSelector:@selector(successful) withObject:nil afterDelay:0.5];
+}else{
+
+//                [self.charArray addObject:self.eatCharFromLibrary];
+//                [self cardToIn:self.eatCharFromLibrary];
+
+//                NSString *word = [dic_eatDic objectForKey:@"eatword"];
+//                [self actionEat:word];
+
+
+NSArray *targetword = [dic_correctString componentsSeparatedByString:@","];
+if (targetword != nil && targetword.count>0) {
+[dic_preWordsArray addObjectsFromArray:targetword];
+}
+//                dispatch_async(dispatch_get_main_queue(), ^{
+//                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//                    for (NSString *word in dic_preWordsArray) {
+//                        [self actionEat:word];
+//                    }
+//                    [self callbackHU:@"1"];
+//                });
+//                    });
+[self performSelector:@selector(successful) withObject:nil afterDelay:0.5];
+
+}
+
+
+}
+break;
+case 4://过
+{
+self.eatView.hidden = YES;
+
+[self resetControlByisEat:NO isting:NO ishu:NO isguo:NO];
+if (self.stepFromOtherOrLibrary == 1) {
+[self actionGuo:self.eatCharFromLibrary];
+}
+
+}
+break;
+
+default:
+break;
+}
+}
+
+-(void) successful{
+
+dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+for (NSString *word in dic_preWordsArray) {
+[self actionEat:word];
+}
+[self callbackHU:@"1"];
+});
+
+
+}
+
+-(void) resetControlByisEat:(BOOL) iseat isting:(BOOL) isting ishu:(BOOL) ishu isguo:(BOOL) isguo{
+UIButton *buttonEat = [_controlView viewWithTag:1000+0];
+UIButton *buttonZu = [_controlView viewWithTag:1000+1];
+UIButton *buttonTing = [_controlView viewWithTag:1000+2];
+UIButton *buttonHu = [_controlView viewWithTag:1000+3];
+UIButton *buttonGuo = [_controlView viewWithTag:1000+4];
+
+buttonZu.enabled = YES;
+[buttonZu setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+
+if (iseat) {
+[buttonEat setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+buttonEat.enabled = YES;
+}else
+{
+[buttonEat setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+buttonEat.enabled = FALSE;
+}
+if (isting) {
+[buttonTing setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+buttonTing.enabled = YES;
+}else
+{
+[buttonTing setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+buttonTing.enabled = NO;
+}
+
+if (ishu) {
+[buttonHu setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+buttonHu.enabled = YES;
+}else
+{
+[buttonHu setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+buttonHu.enabled = NO;
+}
+
+if (isguo) {
+[buttonGuo setTitleColor:[UIColor redColor] forState:UIControlStateNormal];
+buttonGuo.enabled = YES;
+}else
+{
+[buttonGuo setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+buttonGuo.enabled = NO;
+}
+
+}
+
+-(void) resultEatShow{
+
+
+}
+-(void) actionEat:(NSString *) word{
+NSMutableArray *views = [NSMutableArray array];
+for (NSInteger i = 0; i<word.length; i++) {
+NSString *wchar = [word substringWithRange:NSMakeRange(i, 1)];
+BOOL havechar = FALSE;
+CardView *deleteView ;
+for (NSInteger j = 0; j<self.charViewArray.count; j++) {
+CardView *cv = [self.charViewArray objectAtIndex:j];
+if ([cv.charV isEqualToString:wchar]) {
+
+NSString *cvchar = cv.charV;
+NSInteger index = [self.charArray indexOfObject:cvchar];
+if (index != NSNotFound) {
+[self.charArray removeObjectAtIndex:index];
+
+[views addObject:cv];
+deleteView = cv;
+[cv setEatBackGround];
+havechar = TRUE;
+break;
+}
+
+}
+}
+if (!havechar) {
+for (NSInteger j = 0 ; j<self.charViewArray.count; j++) {
+CardView *cv = [self.charViewArray objectAtIndex:j];
+if ([cv.charV isEqualToString:WNKEY]) {
+
+NSString *cvchar = cv.charV;
+NSInteger index = [self.charArray indexOfObject:cvchar];
+[self.charArray removeObjectAtIndex:index];
+[cv setBackToNo];
+cv.placeChar = wchar;
+[views addObject:cv];
+deleteView = cv;
+[cv setEatBackGround];
+break;
+}
+}
+}
+if (deleteView) {
+[self.charViewArray removeObject:deleteView];
+}
+}
+
+
+
+if (self.eatCharArray == nil) {
+self.eatCharArray = [NSMutableArray array];
+}
+if (self.eatCharViewArray == nil) {
+self.eatCharViewArray = [NSMutableArray array];
+}
+[self.eatCharArray addObject:word];
+[self.eatCharViewArray addObject:views];
+
+[self resetFrame];
+}
+-(void) actionTing{
+self.tingView.hidden = NO;
+}
+-(void) actionHu{}
+-(void) actionGuo:(NSString *) achaLibrary{
+
+self.stepFromOtherOrLibrary = 2;
+
+[self.charArray addObject:achaLibrary];
+[self cardToIn:achaLibrary];
+dispatch_async(dispatch_get_global_queue(0, 0), ^{
+
+
+
+NSMutableArray *tmp = [NSMutableArray array];
+[tmp addObjectsFromArray:self.charArray];
+NSDictionary *dic = [[MajHelper shareHelper] start:tmp];
+dic_error = [[dic objectForKey:@"error"] integerValue];//还手率
+dic_correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+dic_lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+dic_needCharArray = [dic objectForKey:@"need"];//需要的字母
+dic_preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+
+
+
+dispatch_async(dispatch_get_main_queue(), ^{
+[self setLogoInfo:dic];
+self.borderState = TRUE;
+});
+
+BOOL iseat =FALSE;
+BOOL ishu =FALSE;
+BOOL isting=FALSE;
+
+if (dic_error == 0) {
+ishu = TRUE;
+
+}
+if (dic_error==1) {
+isting = TRUE;
+}
+dispatch_async(dispatch_get_main_queue(), ^{
+[self resetControlByisEat:false isting:isting ishu:ishu isguo:NO];
+});
+
+});
+}
+-(void) actionOut:(NSString *) c0{
+
+if (self.deskDirect == DeskDirect_TOP) {
+NSInteger index = [self.charArray indexOfObject:c0];
+if (index != NSNotFound) {
+[self.charArray removeObjectAtIndex:index];
+CardView *cv;
+for (NSInteger i = self.charViewArray.count-1; i>0; i--) {
+CardView *card = [self.charViewArray objectAtIndex:i];
+if ([card.charV isEqualToString:c0]) {
+cv = card;
+break;
+}
+}
+if (cv != nil) {
+[self.charViewArray removeObject:cv];
+[cv removeFromSuperview];
+
+}else{
+NSLog(@"应该打出:%@ in %@",c0,self.charArray);
+
+}
+}
+
+}else{
+if (_tingSet) {
+[self.charArray removeLastObject];
+UIView *tingview = [self.charViewArray lastObject];
+[tingview removeFromSuperview];
+[self.charViewArray removeLastObject];
+}else{
+NSInteger index = [self.charArray indexOfObject:c0];
+if (index != NSNotFound) {
+[self.charArray removeObjectAtIndex:index];
+[self.currentSelectedView removeFromSuperview];
+[self.charViewArray removeObject:self.currentSelectedView];
+self.currentRemovedIndex = self.currentSelectedIndex;
+self.currentSelectedView = nil;
+self.currentSelectedIndex = -1;
+
+}
+
+}
+}
+[self cardToOutView:c0];
+[self resetFrame];
+
+[self performSelector:@selector(callBack:) withObject:c0 afterDelay:0.1];
+}
+
+
+
+-(void) cardToOutView:(NSString *) c0{
+
+NSInteger rowNum = 3;
+NSInteger rowofCard = 20;
+
+
+
+if (self.outViewArray == nil) {
+self.outViewArray = [NSMutableArray array];
+}
+[self.outViewArray addObject:c0];
+
+UIImageView *imgv = [[UIImageView alloc] init];
+imgv.image = [UIImage imageNamed:c0];
+float hh = _outView.frame.size.height / rowNum;
+float ww = CARDW * 1.0/(CARDH*1.0) * hh;
+float beginx =( _outView.frame.size.width - rowofCard * ww ) / 2;
+NSInteger cardNum = self.outViewArray.count;
+//    imgv.frame = CGRectMake(self.outViewArray.count*ww, 0, ww, hh);
+imgv.frame = CGRectMake(beginx + cardNum % rowofCard * ww, cardNum/rowofCard * hh, ww, hh);
+[_outView addSubview:imgv];
+
+//    _outView.contentSize = CGSizeMake(MAX(_outView.frame.size.width, self.outViewArray.count*ww), hh);
+//    float offset = _outView.contentSize.width - _outView.frame.size.width ;
+//    if (offset>0) {
+//        offset += ww;
+//    }
+//    [_outView setContentOffset:CGPointMake(offset, _outView.frame.origin.y) animated:YES];
+
+
+
+}
+
+-(void) cardToIn:(NSString *) c0{
+
+CardView *tmp = [self.charViewArray lastObject];
+CardView *tmpv = [[CardView alloc] initWithFrame:CGRectMake(tmp.frame.origin.x+tmp.frame.size.width, tmp.frame.origin.y, tmp.frame.size.width, tmp.frame.size.height) withChar:c0 isBack:self.deskDirect == DeskDirect_TOP];
+tmpv.tag = self.currentRemovedIndex==-1 ? (100+13) : self.currentRemovedIndex;
+NSLog(@"%@",NSStringFromCGRect(tmpv.frame));
+[tmpv addClickBlock:^(NSInteger tag) {
+//        if (self.currentSelectedIndex == tag - 100) {
+//            return ;
+//        }
+//        if (self.currentSelectedIndex == -1) {
+//            self.currentSelectedIndex = tag - 100;
+//            self.currentSelectedView = tmpv;
+//            [self setUP:self.currentSelectedView];
+//        }else{
+//            if (self.borderState) {
+//                NSInteger index = [self indexofCrad:tmpv];
+//                NSInteger sindex = [self indexofCrad:self.currentSelectedView];
+//                if (index != NSNotFound && sindex != NSNotFound) {
+//                    if (sindex>index) {
+//                        [self.charViewArray removeObject:self.currentSelectedView];
+//                        [self.charViewArray insertObject:self.currentSelectedView atIndex:index];
+//                    }else{
+//                        [self.charViewArray removeObject:self.currentSelectedView];
+//                        [self.charViewArray insertObject:self.currentSelectedView atIndex:index-1];
+//                    }
+//                    [self resetFrame];
+//                    self.currentSelectedView = nil;
+//                    self.currentSelectedIndex = -1;
+//
+//                }
+//            }else
+//            {
+//                [self setDown:self.currentSelectedView];
+//                self.currentSelectedIndex = tag - 100;
+//                self.currentSelectedView = tmpv;
+//                [self setUP:self.currentSelectedView];
+//            }
+//        }
+
+if (tmpv.isUpState) {
+[self.selectedCharViewArray removeObject:tmpv];
+[self setDown:tmpv];
+}else{
+[self.selectedCharViewArray addObject:tmpv];
+[self setUP:tmpv];
+}
+}];
+
+//    [tmpv addDoubleClickBlock:^(NSInteger tag) {
+//        [self actionDownForDoubleClick];
+//        [self actionUpForDoubleClick:c0];
+//    }];
+
+[self.charViewArray addObject:tmpv];
+[self addSubview:tmpv];
+[self resetFrame];
+[self bringSubviewToFront:self.wordInfoView];
+}
+
+-(void) callBack:(NSString *) c0{
+
+if (self.didOutCardBlock) {
+self.didOutCardBlock(c0);
+}
+}
+
+#pragma mark "胡"
+-(void) callbackHU:(NSString *) huCount{
+if (self.didFinishedBlock) {
+self.didFinishedBlock(self);
+}
+}
+
+
+-(void) finishedClear{
+
+
+
+dic_error = 0;
+dic_correctString = nil;
+[dic_lastCharArray removeAllObjects] ;
+[dic_needCharArray removeAllObjects] ;
+[dic_preWordsArray removeAllObjects] ;
+[dic_eatDic removeAllObjects];
+
+[_charArray removeAllObjects];
+[_charViewArray removeAllObjects];
+
+_shuaiziNum = 0;
+[_aButton removeFromSuperview];
+_aButton = nil;
+
+_currentSelectedIndex = -1;
+_currentRemovedIndex = -1;
+[_currentSelectedView removeFromSuperview];
+_currentSelectedView = nil;
+
+_tingSet = false ;
+_tingNeedChar = nil;
+_tingLastChar = nil;
+
+[_controlView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+[_controlView removeFromSuperview];
+_controlView = nil;
+[_outView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+[_outView removeFromSuperview];
+_outView = nil;
+[_wordInfoView removeFromSuperview];
+_wordInfoView = nil;
+[_outViewArray removeAllObjects];
+
+
+[_eatCharArray removeAllObjects];
+[_eatCharViewArray removeAllObjects];
+_eatCharFromOther = nil;
+_eatCharFromLibrary = nil;
+
+
+[self.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+}
+
+
+
+- (void)buttonLongPressed:(UILongPressGestureRecognizer *)sender
+{
+
+CardView *btn = (CardView *)sender.view;
+float btnw = btn.frame.size.width;
+if (sender.state == UIGestureRecognizerStateBegan)
+{
+
+_moveCardView = btn;
+_operCardView = btn;
+CGPoint newPoint = [sender locationInView:sender.view];
+_moveLastX = newPoint.x;
+
+NSLog(@"begin...............%@",NSStringFromCGPoint(newPoint));
+
+[UIView animateWithDuration:0.3 animations:^{
+
+btn.transform = CGAffineTransformMakeScale(1.0, 1.0);
+btn.alpha = 0.7;
+}];
+
+}
+else if (sender.state == UIGestureRecognizerStateChanged)
+{
+CGPoint newPoint = [sender locationInView:sender.view];
+
+CGFloat currentx = newPoint.x;
+CGFloat move = currentx - _moveLastX;
+NSLog(@"currentx:%f===lastx:%f======move:%f",currentx,_moveLastX,move);
+if (fabsf(move)>btnw) {
+//            _moveLastX = currentx;
+
+if (move<0) {
+[self moveCard:_moveCardView isLeft:YES];
+}else{
+[self moveCard:_moveCardView isLeft:NO];
+}
+}
+
+NSLog(@"change...............%@",NSStringFromCGPoint(newPoint));
+}
+else if (sender.state == UIGestureRecognizerStateEnded)
+{
+NSLog(@"end...............");
+[self moveFinished];
+_moveCardView = nil;
+_operCardView = nil;
+
+[UIView animateWithDuration:0.3 animations:^{
+
+btn.transform = CGAffineTransformIdentity;
+btn.alpha = 1.0;
+}];
+
+}
+}
+-(NSInteger) indexofCrad:(CardView *) card{
+
+for (NSInteger i = 0; i<self.charViewArray.count; i++) {
+CardView *cv = [self.charViewArray objectAtIndex:i];
+if (cv == card) {
+return i;
+}
+}
+return NSNotFound;
+}
+-(void) moveCard:(CardView *) card isLeft:(BOOL) isleft{
+
+NSInteger index = [self indexofCrad:card];
+
+if(isleft){
+if (index == 0) {
+return;
+}
+CardView *newCard = [self.charViewArray objectAtIndex:index-1];
+_operCardView.frame = CGRectMake(newCard.frame.origin.x, newCard.frame.origin.y - 60, newCard.frame.size.width, newCard.frame.size.height);
+_moveCardView.transform = CGAffineTransformIdentity;
+_moveCardView.alpha = 1.0;
+_moveCardView = newCard;
+[UIView animateWithDuration:0.3 animations:^{
+
+newCard.transform = CGAffineTransformMakeScale(1.0, 1.0);
+newCard.alpha = 0.7;
+}];
+
+
+}else{
+if (index == self.charViewArray.count-1) {
+return;
+}
+CardView *newCard = [self.charViewArray objectAtIndex:index+1];
+_operCardView.frame = CGRectMake(newCard.frame.origin.x, newCard.frame.origin.y - 60, newCard.frame.size.width, newCard.frame.size.height);
+_moveCardView.transform = CGAffineTransformIdentity;
+_moveCardView.alpha = 1.0;
+_moveCardView = newCard;
+[UIView animateWithDuration:0.3 animations:^{
+
+newCard.transform = CGAffineTransformMakeScale(1.0, 1.0);
+newCard.alpha = 0.7;
+}];
+
+}
+}
+-(void) moveFinished{
+
+if (_operCardView != _moveCardView) {
+NSInteger oIndex = [self indexofCrad:_operCardView];
+NSInteger index = [self indexofCrad:_moveCardView];
+if (oIndex != NSNotFound && index != NSNotFound) {
+[self.charViewArray removeObject:_operCardView];
+[self.charViewArray insertObject:_operCardView atIndex:index];
+[self resetFrame];
+}
+
+}
+}
+
+-(void) resultView{
+NSDictionary *dic;
+dic_error = [[dic objectForKey:@"error"] integerValue];//还手率
+dic_correctString = [dic objectForKey:@"chars"]; //剩余字母需要拼的单词 ，分开
+dic_lastCharArray = [dic objectForKey:@"last"];//用不到的字母
+dic_needCharArray = [dic objectForKey:@"need"];//需要的字母
+dic_preWordsArray = [dic objectForKey:@"prewords"];//已经组成的单词
+
+
+}
+
+#pragma mark 吃提示
+
+-(UIView *)eatView{
+if (_eatView == nil) {
+_eatView = [[UIView alloc] initWithFrame:CGRectZero];
+
+}
+return _eatView;
+}
+
+-(void) eatViewFreshByWords:(NSMutableArray *) words{
+[self bringSubviewToFront:self.eatView];
+self.eatView.hidden = NO;
+for (UIView *v in [self.eatView subviews]) {
+[v.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+[v removeFromSuperview];
+}
+
+NSInteger maxlen = 3; //最多提示3个
+
+NSMutableArray *array = [NSMutableArray array];
+if (words.count>maxlen) {
+[array addObjectsFromArray:[words subarrayWithRange:NSMakeRange(0, maxlen)]];
+}else
+[array addObjectsFromArray:words];
+
+NSInteger spacenum = array.count + 1;
+float spacew = 10;
+float maxbuttonw = 20;
+
+NSInteger charnum = 0;
+for (NSString *word in array) {
+charnum += word.length;
+}
+float maxw = self.frame.size.width - 150;
+
+float buttonw = MIN(maxbuttonw, (maxw - spacew*spacenum) *1.0/charnum );
+float buttonh = buttonw * CARDEATH *1.0/ CARDEATW;
+
+float marx = 0;
+float mary = 0;
+float subx = 0;
+float suby = 0;
+marx  = maxw - spacew * spacenum - charnum * buttonw;
+self.eatView.frame = CGRectMake(0, self.bounds.size.height-10-50-buttonh, self.frame.size.width - 150, buttonh);
+{
+if (self.eatborder != nil) {
+[self.eatborder removeFromSuperlayer];
+}
+self.eatborder = [CAShapeLayer layer];
+
+self.eatborder.strokeColor = [UIColor whiteColor].CGColor;
+
+self.eatborder.fillColor = nil;
+self.eatborder.path = [UIBezierPath bezierPathWithRect:CGRectMake(marx-spacew, 0, self.eatView.frame.size.width - marx, self.eatView.frame.size.height)].CGPath;
+
+self.eatborder.frame = self.bounds;
+
+self.eatborder.lineWidth = 1.0f;
+
+self.eatborder.lineCap = @"square";
+
+self.eatborder.lineDashPattern = @[@4, @2];
+
+[self.eatView.layer addSublayer:self.eatborder];
+
+}
+
+for (NSInteger i = 0; i<array.count; i++) {
+
+NSString *word = [array objectAtIndex:i];
+NSMutableArray *placeArray = [self placeCharByWord:word inCharArray:self.charArray];
+UIView *subv = [[UIView alloc] initWithFrame:CGRectMake(marx, mary, buttonw * word.length, buttonh)];
+subv.tag = 10000+i;
+subv.backgroundColor = [UIColor clearColor];
+[subv addClickBlock:^(NSInteger tag) {
+self.eatView.hidden = YES;
+NSInteger wordindex = tag - 10000;
+NSString *word = [array objectAtIndex:wordindex];
+[self actionEatWithAll:word];
+
+for (UIView *v in [self.eatView subviews]) {
+[v.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+[v removeFromSuperview];
+}
+
+}];
+[self.eatView addSubview:subv];
+for (NSInteger j = 0; j<word.length; j++) {
+NSString *c = [word substringWithRange:NSMakeRange(j, 1)];
+CardView *cv;
+if ([[placeArray objectAtIndex:j] isEqualToString:WNKEY]) {
+cv = [[CardView alloc ] initWithFrame:CGRectMake(subx, suby, buttonw, buttonh) withChar:WNKEY isBack:NO];
+[cv setEatBackGround];
+cv.placeChar = c;
+}else{
+cv = [[CardView alloc ] initWithFrame:CGRectMake(subx, suby, buttonw, buttonh) withChar:c isBack:NO];
+[cv setEatBackGround];
+}
+
+
+cv.tag = i * 1000 + j;
+[subv addSubview:cv];
+subx += buttonw;
+}
+[placeArray removeAllObjects];
+marx += buttonw*word.length;
+marx += spacew;
+subx = 0;
+}
+
+
+}
+
+-(NSMutableArray *) placeCharByWord:(NSString *) word inCharArray:(NSMutableArray *) charArray{
+NSMutableArray *result = [NSMutableArray array];
+NSMutableArray *chars = [NSMutableArray array];
+[chars addObjectsFromArray:charArray];
+
+for (NSInteger i = 0; i<word.length; i++) {
+NSString *tmp = [word substringWithRange:NSMakeRange(i, 1)];
+NSInteger index = [chars indexOfObject:tmp];
+if (index != NSNotFound) {
+[result addObject:tmp];
+[chars removeObjectAtIndex:index];
+
+}else{
+[result addObject:WNKEY];
+NSInteger key = [chars indexOfObject:WNKEY];
+if (key != NSNotFound) {
+[chars removeObjectAtIndex:key];
+}
+}
+}
+
+[chars removeAllObjects];
+return result;
+}
+
+
+#pragma mark 虚线
+-(void)setBorderState:(BOOL)borderState{
+if (_borderState != borderState) {
+_borderState = borderState;
+if (_borderState) {
+self.border.lineWidth = 1.0f;
+}else{
+self.border.lineWidth = 0.0f;
+}
+self.borderInfo.hidden = !self.borderState;
+
+}
+}
+-(CAShapeLayer *)border{
+
+if (_border == nil) {
+_border = [CAShapeLayer layer];
+
+_border.strokeColor = [UIColor whiteColor].CGColor;
+
+_border.fillColor = nil;
+
+CGRect rect;
+if (self.deskDirect == DeskDirect_TOP) {
+rect = CGRectMake(150, 0, SCREEN_W - 150, self.frame.size.height);
+}else
+rect = CGRectMake(0, self.frame.size.height - 100, SCREEN_W - 150, 100);
+_border.path = [UIBezierPath bezierPathWithRect:rect].CGPath;
+
+_border.frame = self.bounds;
+
+_border.lineWidth = 0.0f;
+
+_border.lineCap = @"square";
+
+_border.lineDashPattern = @[@4, @2];
+
+[self.layer addSublayer:_border];
+
+}
+return _border;
+}
+
+-(UILabel *)borderInfo{
+
+if (_borderInfo == nil) {
+_borderInfo = [[UILabel alloc] initWithFrame:CGRectMake(0, self.frame.size.height-100, self.frame.size.width, 15)];
+CGRect rect;
+if (self.deskDirect == DeskDirect_TOP) {
+rect = CGRectMake(0, self.frame.size.height - 20, self.frame.size.width, 15);
+_borderInfo.frame = rect;
+}
+
+
+_borderInfo.font = [UIFont systemFontOfSize:10];
+_borderInfo.textAlignment = NSTextAlignmentCenter;
+_borderInfo.textColor = [UIColor redColor];
+_borderInfo.text = @"组模式下 选中一张牌,然后点击另外一张牌，可以将选中牌移动到其前面";
+[self addSubview:_borderInfo];
+}
+return _borderInfo;
+}
+
+
+#pragma mark double-click
+-(void) actionUpForDoubleClick:(NSString *) c{
+
+for (CardView * card in self.charViewArray) {
+NSLog(@"card.char==:%@",[card charV]);
+if (!card.isUpState && [[card charV] isEqualToString:c]) {
+[self setUP:card];
+}
+}
+
+}
+
+-(void) actionDownForDoubleClick{
+[self.selectedCharViewArray removeAllObjects];
+for (CardView * card in self.charViewArray) {
+if (card.isUpState) {
+[self setDown:card];
+}
+}
+}
+
+#pragma mark 点击单词列表，将单词所含字符弹起
+-(void) actionUpByWord:(NSString *) word{
+[self actionDownForDoubleClick];
+for (NSInteger i = 0;i<word.length;i++) {
+NSString *charv = [word substringWithRange:NSMakeRange(i, 1)];
+for (CardView * card in self.charViewArray) {
+if ([[card charV] isEqualToString:charv]) {
+[self setUP:card];
+[self.selectedCharViewArray addObject:card];
+break;
+}
+}
+}
+}
+@end
+

@@ -1,0 +1,46 @@
+//
+//  PrefixHeader.pch
+//  MaJDemo
+//
+//  Created by ly on 2017/1/17.
+//  Copyright © 2017年 HX. All rights reserved.
+//
+
+#ifndef PrefixHeader_pch
+#define PrefixHeader_pch
+
+// Include any system framework and library headers here that should be included in all compilation units.
+// You will also need to set the Prefix Header build setting of one or more of your targets to reference this file.
+
+#endif /* PrefixHeader_pch */
+
+
+#import "Beans.h"
+#import "MajHelper.h"
+
+//单词长度4-5
+#define MIN_WORD_LEN 3
+#define MAX_WORD_LEN 6
+#define SUCCESS_CARD_COUNT 14
+
+#define CARDH 132.0
+#define CARDW 110.0
+#define LEFTSHADE 10.0/55.0
+#define LEFTSHADESHOW 0.2
+
+#define CARDEATH 141.0
+#define CARDEATW 102.0
+
+#define WNKEY @"万"
+
+#define SCREEN_W [[UIScreen mainScreen] bounds].size.width
+#define SCREEN_H [[UIScreen mainScreen] bounds].size.height
+#define IPHONE5 ([[UIScreen mainScreen] bounds].size.width==568)
+
+#define IP6PLUSRATE_TO_IP6 1.104
+
+#define IP6PLUSRATE  (IPHONE5 ? (IP6PLUSRATE_TO_IP6 * (750.0/640.0)) : IP6PLUSRATE_TO_IP6)
+
+#define CLEARREMINDER @"clear_reminder" 
+
+

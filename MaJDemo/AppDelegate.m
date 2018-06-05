@@ -7,6 +7,8 @@
 //
 
 #import "AppDelegate.h"
+#import "MajHelper.h"
+#import "SignalHandler.h"
 
 @interface AppDelegate ()
 
@@ -16,9 +18,52 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    
+    
+    
+    
     // Override point for customization after application launch.
+    self.window = [[UIWindow alloc] init];
+    self.rootVC = [[DeskVC alloc] init];
+    self.window.rootViewController = self.rootVC;
+    [self.window makeKeyAndVisible];
+    
+    
+        NSSetUncaughtExceptionHandler(&uncaughtExceptionHandler);//异常处理
+        [SignalHandler RegisterSignalHandler];//signal 处理
+    
     return YES;
 }
+
+void uncaughtExceptionHandler(NSException *exception) {
+    NSLog(@"CRASH: %@", exception);
+    NSLog(@"Stack Trace: %@", [exception callStackSymbols]);
+    NSString *documentDirectory = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject];
+    NSString *errordir=[documentDirectory stringByAppendingPathComponent:@"errordump"];
+    BOOL isdir;
+    NSFileManager *fm=[NSFileManager defaultManager];
+    if(![fm fileExistsAtPath:errordir isDirectory:&isdir]){
+        [fm createDirectoryAtPath:errordir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    
+    NSString *str=[NSString stringWithFormat:@"%@:%@",exception,
+                   [exception callStackSymbols]];
+    NSDictionary *dic = @{@"error":str,@"orderNo":[NSString stringWithFormat:@"%@error",
+                                                   @"error"]};
+    
+    
+    
+    
+    NSString *errorfile=[errordir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@error.txt",
+                                                                  [NSDate date]]];
+    
+    [str writeToFile:errorfile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    
+    NSLog(@"errorFile:%@",errorfile);
+    
+    // Internal error reporting
+}
+
 
 
 - (void)applicationWillResignActive:(UIApplication *)application {
